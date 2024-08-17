@@ -1,9 +1,9 @@
-name: Deploy to VM
+name: Deploy to VM 
 
 on:
   push:
     branches:
-      - main
+      - master
 
 jobs:
   deploy:
@@ -16,21 +16,27 @@ jobs:
       - name: Install SSH key
         uses: shimataro/ssh-key-action@v2
         with:
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          known_hosts: ${{ secrets.VM_HOST }}
+          key: ${{ secrets.SSH_KEY }}
+          known_hosts: ${{ secrets.HOST }}
 
       - name: SSH into server and deploy
-        uses: appleboy/ssh-action@v0.1.5
+        uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
           script: |
+            # Define the application directory
+            APP_DIR="/home/${{ secrets.USERNAME }}/simple-api"
+
+            # Debug: Check if APP_DIR is correctly defined
+            echo "App Directory: $APP_DIR"
+
             # Create the directory if it doesn't exist
-            mkdir -p ~/simple-api
+            mkdir -p "$APP_DIR"
 
             # Navigate to the application directory
-            cd simple-api
+            cd "$APP_DIR"
 
             # If there’s an existing instance, stop it
             pkill -f "node index.js" || true
