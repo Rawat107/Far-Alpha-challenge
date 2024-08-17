@@ -15,6 +15,7 @@ jobs:
 
       - name: Add SSH host key
         run: |
+          mkdir -p ~/.ssh
           ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
 
       - name: Deploy via SSH
