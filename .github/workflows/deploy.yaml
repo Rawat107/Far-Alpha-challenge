@@ -1,0 +1,41 @@
+name: Deploy API on Azure VM
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+           script: |
+            if ! command -v node &> /dev/null
+            then
+              curl -fsSL https://deb.nodesource.com/setup_14.x | sudo -E bash -
+              sudo apt-get install -y nodejs
+            fi
+
+            # Ensure pm2 is installed
+            if ! command -v pm2 &> /dev/null
+            then
+              sudo npm install -g pm2
+            fi
+            
+            pm2 stop all || true 
+            pm2 delete all || true 
+            mkdir -p ~/simple-api 
+            rsync -avz --delete . ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:~/simple-api/ 
+            cd ~/simple-api
+            npm install 
+            sudo pm2 start index.js --name "simple-api" --watch 
