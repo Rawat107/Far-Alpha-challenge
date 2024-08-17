@@ -27,7 +27,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             # Define the application directory
-            APP_DIR="/home/${{ secrets.USERNAME }}/"
+            APP_DIR="/home/${{ secrets.VM_USER }}/simple-api"
 
             # Debug: Check if APP_DIR is correctly defined
             echo "App Directory: $APP_DIR"
