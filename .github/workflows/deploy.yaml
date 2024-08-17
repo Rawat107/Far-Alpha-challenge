@@ -27,19 +27,21 @@ jobs:
             sudo apt-get install -y nodejs
             sudo npm install -g pm2
 
+            # Accept the host key
+            ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
+
             # Stop and delete all existing pm2 processes
             pm2 stop all || true
             pm2 delete all || true
 
-            # Create the application directory
-            mkdir -p ~/simple-api
+            # Create the application directory on the VM
+            ssh ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} "mkdir -p ~/simple-api"
 
             # Sync the application files from GitHub Actions runner to the VM
-            rsync -avz --delete ~/simple-api/ ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:~/simple-api/
+            rsync -avz --delete ./ ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:~/simple-api/
 
             # Navigate to the application directory and install dependencies
-            cd ~/simple-api
-            npm install
+            ssh ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} "cd ~/simple-api && npm install"
 
             # Start the application with pm2
-            pm2 start index.js --name "simple-api" --watch
+            ssh ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} "cd ~/simple-api && pm2 start index.js --name 'simple-api' --watch"
