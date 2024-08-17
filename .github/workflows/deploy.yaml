@@ -26,17 +26,11 @@ jobs:
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Define the application directory
-            APP_DIR="/home/${{ secrets.USERNAME }}/simple-api"
-
-            # Debug: Check if APP_DIR is correctly defined
-            echo "App Directory: $APP_DIR"
-
             # Create the directory if it doesn't exist
-            mkdir -p "$APP_DIR"
+            mkdir -p ~/simple-api
 
             # Navigate to the application directory
-            cd "$APP_DIR"
+            cd simple-api
 
             # If there’s an existing instance, stop it
             pkill -f "node index.js" || true
