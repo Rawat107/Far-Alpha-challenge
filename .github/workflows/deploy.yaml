@@ -1,4 +1,4 @@
-name: Deploy API on Azure VM
+name: Deploy Node.js Application
 
 on:
   push:
@@ -10,37 +10,59 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout Code
+      uses: actions/checkout@v3
 
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v0.1.5
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            # Update package index and install prerequisites
-            sudo apt-get update
-            sudo apt-get install -y curl rsync
-            curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-            sudo apt-get install -y nodejs
-            sudo npm install -g pm2
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
 
-            # Stop and delete all existing pm2 processes
-            pm2 stop all || true
-            pm2 delete all || true
+    - name: Install Dependencies
+      run: npm install
 
-            # Create the application directory
-            mkdir -p ~/simple-api
+    - name: Archive Production Artifacts
+      run: zip -r simple-api.zip .
 
-      - name: Sync and Deploy Application
-        run: |
-          rsync -avz --delete ./simple-api/ ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:~/simple-api/
-          ssh -o StrictHostKeyChecking=no ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
-            cd ~/simple-api
-            npm install
-            pm2 start index.js --name "simple-api" --watch
-          EOF
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+    - name: Copy Artifacts to Remote Server
+      uses: appleboy/scp-action@v0.1.0
+      with:
+        host: ${{ secrets.REMOTE_HOST }}
+        username: ${{ secrets.REMOTE_USER }}
+        key: ${{ secrets.REMOTE_KEY }}
+        source: "simple-api.zip"
+        target: "~/simple-api"
+
+    - name: SSH into Remote Server and Deploy
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.REMOTE_HOST }}
+        username: ${{ secrets.REMOTE_USER }}
+        key: ${{ secrets.REMOTE_KEY }}
+        script: |
+          sudo apt-get update
+          sudo apt-get install -y curl rsync
+          curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+          sudo apt-get install -y nodejs
+          sudo npm install -g pm2
+
+          # Stop and delete all existing pm2 processes if any
+          pm2 stop simple-api || true
+          pm2 delete simple-api || true
+
+          # Create the application directory
+          mkdir -p ~/simple-api
+          unzip ~/simple-api/simple-api.zip -d ~/simple-api
+
+          # Install dependencies
+          cd ~/simple-api
+          npm install
+
+          # Start the application with pm2
+          pm2 start index.js --name "simple-api"
+
+          # Save the pm2 process list so that it can be resurrected on reboot
+          pm2 save
+
+          # Make sure pm2 restarts on system reboot
+          pm2 startup systemd
