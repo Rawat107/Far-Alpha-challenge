@@ -20,7 +20,7 @@ jobs:
           known_hosts: ${{ secrets.VM_HOST }}
 
       - name: SSH into server and deploy
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v0.1.5
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
