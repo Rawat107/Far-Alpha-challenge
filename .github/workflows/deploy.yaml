@@ -1,68 +1,58 @@
-name: Deploy Node.js Application
+name: Deploy to VM (using SSH)
 
 on:
   push:
     branches:
-      - main
+      - master
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v2
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
+      - name: Install SSH key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          known_hosts: ${{ secrets.VM_HOST }}
 
-    - name: Install Dependencies
-      run: npm install
+      - name: SSH into server and deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # Create the directory if it doesn't exist
+            mkdir -p $APP_DIR
 
-    - name: Archive Production Artifacts
-      run: zip -r simple-api.zip .
+            # Navigate to the application directory
+            cd $APP_DIR
 
-    - name: Copy Artifacts to Remote Server
-      uses: appleboy/scp-action@v0.1.0
-      with:
-        host: ${{ secrets.REMOTE_HOST }}
-        username: ${{ secrets.REMOTE_USER }}
-        key: ${{ secrets.REMOTE_KEY }}
-        source: "simple-api.zip"
-        target: "~/simple-api"
+            # If there’s an existing instance, stop it
+            pkill -f "node index.js" || true
 
-    - name: SSH into Remote Server and Deploy
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.REMOTE_HOST }}
-        username: ${{ secrets.REMOTE_USER }}
-        key: ${{ secrets.REMOTE_KEY }}
-        script: |
-          sudo apt-get update
-          sudo apt-get install -y curl rsync
-          curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-          sudo apt-get install -y nodejs
-          sudo npm install -g pm2
+            # Pull the latest code
+            git init
+            git remote add origin git@github.com:YOUR_GITHUB_USERNAME/YOUR_REPO_NAME.git
+            git pull origin master
 
-          # Stop and delete all existing pm2 processes if any
-          pm2 stop simple-api || true
-          pm2 delete simple-api || true
+            # Install dependencies
+            npm install
 
-          # Create the application directory
-          mkdir -p ~/simple-api
-          unzip ~/simple-api/simple-api.zip -d ~/simple-api
+            # Start the application in the background
+            nohup npm start &
 
-          # Install dependencies
-          cd ~/simple-api
-          npm install
+            # Verify if the app is running on port 80
+            lsof -i:80
 
-          # Start the application with pm2
-          pm2 start index.js --name "simple-api"
+      - name: Notify on Success
+        if: success()
+        run: echo "Deployment completed successfully!"
 
-          # Save the pm2 process list so that it can be resurrected on reboot
-          pm2 save
-
-          # Make sure pm2 restarts on system reboot
-          pm2 startup systemd
+      - name: Notify on Failure
+        if: failure()
+        run: echo "Deployment failed. Please check the logs."
