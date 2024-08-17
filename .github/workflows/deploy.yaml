@@ -13,6 +13,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Add SSH host key
+        run: |
+          ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v0.1.5
         with:
@@ -20,6 +24,11 @@ jobs:
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            # Update package index and install prerequisites
+            sudo apt-get update
+            sudo apt-get install -y curl rsync
+
+            # Install Node.js if not installed
             if ! command -v node &> /dev/null
             then
               curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
@@ -33,18 +42,18 @@ jobs:
             fi
 
             # Stop and delete all existing pm2 processes
-            pm2 stop all || true 
-            pm2 delete all || true 
+            pm2 stop all || true
+            pm2 delete all || true
 
             # Create the application directory
-            mkdir -p ~/simple-api 
+            mkdir -p ~/simple-api
 
             # Sync the application files from GitHub Actions runner to the VM
-            rsync -avz --delete . ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:~/simple-api/ 
+            rsync -avz --delete ~/simple-api/ ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:~/simple-api/
 
             # Navigate to the application directory and install dependencies
             cd ~/simple-api
-            npm install 
+            npm install
 
             # Start the application with pm2
-            sudo pm2 start index.js --name "simple-api" --watch
+            pm2 start index.js --name "simple-api" --watch
