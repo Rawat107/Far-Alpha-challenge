@@ -26,6 +26,12 @@ jobs:
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            # Define the application directory
+            APP_DIR="/home/${{ secrets.USERNAME }}/app"
+
+            # Debug: Check if APP_DIR is correctly defined
+            echo "App Directory: $APP_DIR"
+            
             # Create the directory if it doesn't exist
             mkdir -p $APP_DIR
 
